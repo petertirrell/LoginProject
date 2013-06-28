@@ -1,6 +1,7 @@
-from pyramid.session import UnencryptedCookieSessionFactoryConfig
-my_session_factory = UnencryptedCookieSessionFactoryConfig('itsaseekreet')
+#from pyramid.session import UnencryptedCookieSessionFactoryConfig
+#my_session_factory = UnencryptedCookieSessionFactoryConfig('itsaseekreet')
 
+from pyramid_beaker import session_factory_from_settings
 from pyramid.config import Configurator
 from sqlalchemy import engine_from_config
 
@@ -23,9 +24,11 @@ def main(global_config, **settings):
         'sosecret', callback=groupfinder, hashalg='sha512')
     authz_policy = ACLAuthorizationPolicy()
     
+    my_session_factory = session_factory_from_settings(settings)
     config = Configurator(settings=settings,
                           root_factory='loginproject.models.RootFactory',
                           session_factory=my_session_factory)
+    config.include('pyramid_beaker')
     config.set_authentication_policy(authn_policy)
     config.set_authorization_policy(authz_policy)
     

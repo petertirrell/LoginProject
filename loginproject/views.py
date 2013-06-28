@@ -36,7 +36,7 @@ from authomatic.adapters import PyramidAdapter
 
 from config import CONFIG
 
-authomatic = Authomatic(config=CONFIG, secret='my new secret string')
+authomatic = Authomatic(config=CONFIG, secret='itsaseekreet')
 
 @view_config(route_name='home', renderer='home.mako', permission='view')
 def my_view(request):
@@ -109,7 +109,7 @@ def login(request):
 
     return dict(
         message = 'foo',
-        url = request.application_url + '/login/twitter',
+        url = login_url,
         came_from = came_from        
         )
 
