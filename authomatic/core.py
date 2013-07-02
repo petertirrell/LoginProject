@@ -351,7 +351,7 @@ class Session(object):
             If ``True`` the cookie value will be ``deleted`` and the
             Expires value will be ``Thu, 01-Jan-1970 00:00:01 GMT``.
         """
-
+        print 'creating cookie data {0}'.format(self.data)
         template = '{name}={value}; Domain={domain}; Path={path}; HttpOnly{secure}{expires}'
 
         value = 'deleted' if delete else self._serialize(self.data)
@@ -373,12 +373,14 @@ class Session(object):
         """
 
         if self.data:
+            print 'setting cookie header'
             # Set the cookie header.
             self.adapter.set_header('Set-Cookie', self.create_cookie())
 
             # Reset data
             self._data = {}
-
+        else:
+            print 'self.data is nothing'
 
     def delete(self):
         self.adapter.set_header('Set-Cookie', self.create_cookie(delete=True))

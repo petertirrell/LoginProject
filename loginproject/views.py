@@ -36,7 +36,9 @@ from authomatic.adapters import PyramidAdapter
 
 from config import CONFIG
 
-authomatic = Authomatic(config=CONFIG, secret='0cb243f53ad865a0f70099c0414ffe9cfcfe03ac')
+authomatic = Authomatic(config=CONFIG, 
+    secret='0cb243f53ad865a0f70099c0414ffe9cfcfe03ac'
+    )
 
 @view_config(route_name='home', renderer='home.mako', permission='view')
 def my_view(request):
@@ -85,6 +87,10 @@ def login(request):
     else:
         print 'Fred was not in the session'
 
+    print 'Session ID: {0}'.format(request.session.id)
+    print 'Headers: {0}'.format(request.response.headerlist)
+
+    authomatic.session = request.session
     result = authomatic.login(PyramidAdapter(request),provider)
     #result = None
     if result:

@@ -237,12 +237,12 @@ class PyramidAdapter(WebObAdapter):
     
     Inherits from the :class:`.WebObAdapter`.
     """
-    
+
     def __init__(self, request):
 
         self.request = request
         self.response = request.response
-
+    
 
 class WerkzeugAdapter(BaseAdapter):
     """

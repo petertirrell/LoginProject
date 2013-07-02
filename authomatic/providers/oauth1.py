@@ -368,6 +368,7 @@ class OAuth1(providers.AuthorizationProvider):
             if not token_secret:
                 raise FailureError('Unable to retrieve token secret from storage!')
             
+            self._log(logging.INFO, 'Found token_secret! {0}'.format(token_secret))
             # Get Access Token          
             self._log(logging.INFO, 'Fetching for access token from {}.'.format(self.access_token_url))
             
