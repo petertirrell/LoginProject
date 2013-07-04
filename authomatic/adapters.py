@@ -231,18 +231,6 @@ class Webapp2Adapter(WebObAdapter):
         self.request = handler.request
         self.response = handler.response
 
-class PyramidAdapter(WebObAdapter):
-    """
-    Adapter for the |pyramid|_ framework.
-    
-    Inherits from the :class:`.WebObAdapter`.
-    """
-
-    def __init__(self, request):
-
-        self.request = request
-        self.response = request.response
-    
 
 class WerkzeugAdapter(BaseAdapter):
     """

@@ -10,7 +10,9 @@
 <body>
   <div id="header">
    % if logged_in == None:
-   <a href="${request.application_url}/login/twitter">Login with Twitter</a>
+   <a href="${request.application_url}/login/twitter">Login with Twitter</a><br>
+   <a href="${request.application_url}/login/facebook">Login with Facebook</a><br>
+   <a href="${request.application_url}/login/google">Login with Google</a><br>
    % else:
    Logged in as ${logged_in} |
    <a href="${request.application_url}/logout">Logout</a>

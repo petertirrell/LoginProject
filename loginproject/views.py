@@ -1,5 +1,5 @@
 from pyramid.response import Response
-from pyramid.request import Request
+#from pyramid.request import Request
 from pyramid.httpexceptions import (
     HTTPFound,
     HTTPNotFound,
@@ -21,37 +21,28 @@ from .security import USERS
 
 from sqlalchemy.exc import DBAPIError
 
-from authomatic import Authomatic
-
-from config import CONFIG
-
 from .models import (
     DBSession,
     MyModel,
     )
 
-
 from authomatic import Authomatic
-from authomatic.adapters import PyramidAdapter
+from authomatic.adapters import WebObAdapter
 
 from config import CONFIG
 
-authomatic = Authomatic(config=CONFIG, 
-    secret='0cb243f53ad865a0f70099c0414ffe9cfcfe03ac'
-    )
+authomatic = Authomatic(config=CONFIG, secret='some random secret string')
 
-@view_config(route_name='home', renderer='home.mako', permission='view')
-def my_view(request):
-    #try:
-    #    one = DBSession.query(MyModel).filter(MyModel.name == 'one').first()
-    #except DBAPIError:
-    #    return Response(conn_err_msg, content_type='text/plain', status_int=500)
-    #return {'one': one, 'project': 'LoginProject'}
-    return dict(
-        one='foo',
-        two='bar',
-        logged_in = authenticated_userid(request)
-        )
+@view_config(route_name='home', permission='view')
+def home(request):
+    return Response('''
+        Login with <a href="login/facebook">Facebook</a>.<br />
+        Login with <a href="login/twitter">Twitter</a>.<br />
+        <form action="login/oi">
+            <input type="text" name="id" value="me.yahoo.com" />
+            <input type="submit" value="Authenticate With OpenID">
+        </form>
+    ''')
 
 
 @view_config(route_name='protected', renderer='protected.mako', permission='edit')
@@ -63,73 +54,108 @@ def viewProtected(request):
         logged_in = authenticated_userid(request)
         )
 
-@view_config(route_name='login', renderer='login.mako')
-@forbidden_view_config(renderer='login.mako')
+#@view_config(route_name='login', renderer='login.mako')
+#@forbidden_view_config(renderer='login.mako')
+@view_config(route_name='login')
 def login(request):
+    response = Response()
     # get provider
     provider = request.matchdict.get('provider')
-    print provider
+    
+    result = authomatic.login(WebObAdapter(request, response),provider)
 
-    login_url = request.route_url('login', provider=provider)
-    referrer = request.url
-    if referrer == login_url:
-        referrer = '/' # never use the login form itself as came_from
-    came_from = request.params.get('came_from', referrer)
-
-    if 'token_secret' in request.session:
-        print 'secret: ' + request.session['token_secret']
-
-    if 'abc' in request.session:
-        request.session['fred'] = 'yes'
-    request.session['abc'] = '123'
-    if 'fred' in request.session:
-        print 'Fred was in the session'
-    else:
-        print 'Fred was not in the session'
-
-    print 'Session ID: {0}'.format(request.session.id)
-    print 'Headers: {0}'.format(request.response.headerlist)
-
-    authomatic.session = request.session
-    result = authomatic.login(PyramidAdapter(request),provider)
-    #result = None
+    # Do not write anything to the response if there is no result!
     if result:
-            print 'We have a result!'
-            print result
-            if result.error:
-                print 'Error! ' + result.error.message
-            elif result.user:
-                if not (result.user.name and result.user.id):
-                    print 'trying to update user'
-                    result.user.update()
-                print result
-                print result.user.name
-    
-                headers = remember(request, result)
-                return HTTPFound(location = came_from,
-                                         headers = headers)
+        # If there is result, the login procedure is over and we can write to response.
+        response.write('<a href="..">Home</a>')
+        
+        if result.error:
+            # Login procedure finished with an error.
+            response.write('<h2>Damn that error: {}</h2>'.format(result.error.message))
+        
+        elif result.user:
+            # Hooray, we have the user!
+            
+            # OAuth 2.0 and OAuth 1.0a provide only limited user data on login,
+            # We need to update the user to get more info.
+            if not (result.user.name and result.user.id):
+                result.user.update()
+            
+            # Welcome the user.
+            response.write('<h1>Hi {}</h1>'.format(result.user.name))
+            response.write('<h2>Your id is: {}</h2>'.format(result.user.id))
+            response.write('<h2>Your email is: {}</h2>'.format(result.user.email))
+            
+            # Seems like we're done, but there's more we can do...
+            
+            # If there are credentials (only by AuthorizationProvider),
+            # we can _access user's protected resources.
+            if result.user.credentials:
+                
+                # Each provider has it's specific API.
+                if result.provider.name == 'fb':
+                    response.write('Your are logged in with Facebook.<br />')
+                    
+                    # We will access the user's 5 most recent statuses.
+                    url = 'https://graph.facebook.com/{}?fields=feed.limit(5)'
+                    url = url.format(result.user.id)
+                    
+                    # Access user's protected resource.
+                    access_response = result.provider.access(url)
+                    
+                    if access_response.status == 200:
+                        # Parse response.
+                        statuses = access_response.data.get('feed').get('data')
+                        error = access_response.data.get('error')
+                        
+                        if error:
+                            response.write('Damn that error: {}!'.format(error))
+                        elif statuses:
+                            response.write('Your 5 most recent statuses:<br />')
+                            for message in statuses:
+                                
+                                text = message.get('message')
+                                date = message.get('created_time')
+                                
+                                response.write('<h3>{}</h3>'.format(text))
+                                response.write('Posted on: {}'.format(date))
+                    else:
+                        response.write('Damn that unknown error!<br />')
+                        response.write('Status: {}'.format(response.status))
+                    
+                if result.provider.name == 'tw':
+                    response.write('Your are logged in with Twitter.<br />')
+                    
+                    # We will get the user's 5 most recent tweets.
+                    url = 'https://api.twitter.com/1.1/statuses/user_timeline.json'
+                    
+                    # You can pass a dictionary of querystring parameters.
+                    access_response = result.provider.access(url, {'count': 5})
+                                            
+                    # Parse response.
+                    if access_response.status == 200:
+                        if type(access_response.data) is list:
+                            # Twitter returns the tweets as a JSON list.
+                            response.write('Your 5 most recent tweets:')
+                            for tweet in access_response.data:
+                                text = tweet.get('text')
+                                date = tweet.get('created_at')
+                                
+                                response.write('<h3>{}</h3>'.format(text.replace(u'\u2026', '...')))
+                                response.write('Tweeted on: {}'.format(date))
+                                
+                        elif access_response.data.get('errors'):
+                            response.write('Damn that error: {}!'.\
+                                                format(response.data.get('errors')))
+                    else:
+                        response.write('Damn that unknown error!<br />')
+                        response.write('Status: {}'.format(response.status))
 
-    print 'something went wrong, bailing and just pulling the login page'
-    
-    '''if 'form.submitted' in request.params:
-        login = request.params['login']
-        password = request.params['password']
-        if USERS.get(login) == password:
-            headers = remember(request, login)
-            return HTTPFound(location = came_from,
-                             headers = headers)
-        message = 'Failed login'
-        '''
-
-    return dict(
-        message = 'foo',
-        url = login_url,
-        came_from = came_from        
-        )
+    return response
 
 @view_config(route_name='logout')
 def logout(request):
-    headers = forget(request)
+    headers = forget(request)    
     return HTTPFound(location = request.route_url('home'),
                      headers = headers)
 

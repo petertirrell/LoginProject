@@ -368,7 +368,6 @@ class OAuth1(providers.AuthorizationProvider):
             if not token_secret:
                 raise FailureError('Unable to retrieve token secret from storage!')
             
-            self._log(logging.INFO, 'Found token_secret! {0}'.format(token_secret))
             # Get Access Token          
             self._log(logging.INFO, 'Fetching for access token from {}.'.format(self.access_token_url))
             
@@ -445,9 +444,7 @@ class OAuth1(providers.AuthorizationProvider):
             token_secret = response.data.get('oauth_token_secret')
             if token_secret:
                 # we need token secret after user authorization redirect to get access token
-                self._log(logging.INFO, 'setting token_secret {0}'.format(token_secret))
                 self._session_set('token_secret', token_secret)
-                self._log(logging.INFO, 'getting back token_secret we just set {0}'.format(self._session_get('token_secret')))
             else:
                 raise FailureError('Failed to obtain token secret from {}!'.format(self.request_token_url),
                                   original_message=response.content,
@@ -758,7 +755,7 @@ class Yahoo(OAuth1):
     request_token_url = 'https://api.login.yahoo.com/oauth/v2/get_request_token'
     user_authorization_url = 'https://api.login.yahoo.com/oauth/v2/request_auth'
     access_token_url = 'https://api.login.yahoo.com/oauth/v2/get_token'
-    user_info_url = 'http://query.yahooapis.com/v1/yql?q=select%20*%20from%20social.profile%20where%20guid%3Dme&format=json'
+    user_info_url = 'http://query.yahooapis.com/v1/yql?q=select%20*%20from%20social.profile%20where%20guid%3Dme%3B&format=json'
     
     same_origin = False
     supports_jsonp = True
@@ -772,6 +769,8 @@ class Yahoo(OAuth1):
         user.gender = _user.get('gender')
         user.nickname = _user.get('nickname')
         user.link = _user.get('profileUrl')
+        
+        user.email = _user.get('emails', {}).get('handle')
         
         user.picture = _user.get('image', {}).get('imageUrl')
         

@@ -154,10 +154,6 @@ class BaseProvider(object):
         self.popup = self._kwarg(kwargs, 'popup')
     
     
-    ###############################################
-    # From Middleware
-    ###############################################
-    
     @property
     def url(self):
         return self.adapter.url
@@ -288,7 +284,7 @@ class BaseProvider(object):
         """Saves a value to session."""
         
         self.session[self._session_key(key)] = value
-        
+    
     
     def _session_get(self, key):
         """Retrieves a value from session."""

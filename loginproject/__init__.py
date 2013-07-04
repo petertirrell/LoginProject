@@ -20,9 +20,9 @@ def main(global_config, **settings):
     engine = engine_from_config(settings, 'sqlalchemy.')
     DBSession.configure(bind=engine)
     Base.metadata.bind = engine
-    authn_policy = AuthTktAuthenticationPolicy(
+    '''authn_policy = AuthTktAuthenticationPolicy(
         'sosecret', callback=groupfinder, hashalg='sha512')
-    authz_policy = ACLAuthorizationPolicy()
+    authz_policy = ACLAuthorizationPolicy()'''
     
     my_session_factory = session_factory_from_settings(settings)
     config = Configurator(settings=settings,
@@ -32,8 +32,8 @@ def main(global_config, **settings):
     config.include('pyramid_beaker')
     config.set_session_factory(my_session_factory)
 
-    config.set_authentication_policy(authn_policy)
-    config.set_authorization_policy(authz_policy)
+    '''config.set_authentication_policy(authn_policy)
+    config.set_authorization_policy(authz_policy)'''
     
     config.add_static_view('static', 'static', cache_max_age=3600)
     
