@@ -40,3 +40,4 @@ nosetests.xml
 
 # config stuff
 config.py
+development.ini.local

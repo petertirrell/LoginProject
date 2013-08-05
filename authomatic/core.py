@@ -352,12 +352,17 @@ class Session(object):
             Expires value will be ``Thu, 01-Jan-1970 00:00:01 GMT``.
         """
 
-        template = '{name}={value}; Domain={domain}; Path={path}; HttpOnly{secure}{expires}'
-
         value = 'deleted' if delete else self._serialize(self.data)
 
         split_url = urlparse.urlsplit(self.adapter.url)
         domain = split_url.netloc.split(':')[0]
+
+        # Work-around for issue #11, failure of WebKit-based browsers to accept
+        # cookies set as part of a redirect response in some circumstances.
+        if not '.' in domain:
+            template = '{name}={value}; Path={path}; HttpOnly{secure}{expires}'
+        else:
+            template = '{name}={value}; Domain={domain}; Path={path}; HttpOnly{secure}{expires}'
 
         return template.format(name=self.name,
                                value=value,
@@ -771,7 +776,8 @@ class Credentials(ReprMixin):
 
         if hasattr(self.provider_class, 'refresh_credentials'):
             if force or self.expire_soon(soon):
-                return self.provider_class.refresh_credentials(self)
+                logging.info('PROVIDER NAME: {}'.format(self.provider_name))
+                return self.provider_class(self, None, self.provider_name).refresh_credentials(self)
 
 
     def async_refresh(self, *args, **kwargs):
@@ -1364,14 +1370,18 @@ class Authomatic(object):
         ProviderClass = credentials.provider_class
         logging.info('ACCESS HEADERS: {}'.format(headers))
         # Access resource and return response.
-        return ProviderClass.access_with_credentials(credentials=credentials,
-                                                     url=url,
-                                                     params=params,
-                                                     method=method,
-                                                     headers=headers,
-                                                     body=body,
-                                                     max_redirects=max_redirects,
-                                                     content_parser=content_parser)
+        
+        provider_settings = self.config.get(credentials.provider_name)
+        provider = ProviderClass(provider_settings)
+        provider.credentials = credentials
+        
+        return provider.access(url=url,
+                               params=params,
+                               method=method,
+                               headers=headers,
+                               body=body,
+                               max_redirects=max_redirects,
+                               content_parser=content_parser)
     
     
     def async_access(self, *args, **kwargs):

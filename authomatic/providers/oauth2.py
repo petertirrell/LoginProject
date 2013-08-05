@@ -217,8 +217,7 @@ class OAuth2(providers.AuthorizationProvider):
         return credentials
     
     
-    @classmethod
-    def refresh_credentials(cls, credentials):
+    def refresh_credentials(self, credentials):
         """
         Refreshes :class:`.Credentials` if it gives sense.
         
@@ -229,7 +228,7 @@ class OAuth2(providers.AuthorizationProvider):
             :class:`.Response`.
         """
         
-        if not cls._x_refresh_credentials_if(credentials):
+        if not self._x_refresh_credentials_if(credentials):
             return
         
         # We need consumer key and secret to make this kind of request.
@@ -237,13 +236,13 @@ class OAuth2(providers.AuthorizationProvider):
         credentials.consumer_key = cfg.get('consumer_key')
         credentials.consumer_secret = cfg.get('consumer_secret')
         
-        request_elements = cls.create_request_elements(request_type=cls.REFRESH_TOKEN_REQUEST_TYPE,
+        request_elements = self.create_request_elements(request_type=self.REFRESH_TOKEN_REQUEST_TYPE,
                                                         credentials=credentials,
-                                                        url=cls.access_token_url,
+                                                        url=self.access_token_url,
                                                         method='POST')
         
-        cls._log(logging.INFO, 'Refreshing credentials.')
-        response = cls._fetch(*request_elements)
+        self._log(logging.INFO, 'Refreshing credentials.')
+        response = self._fetch(*request_elements)
         
         # We no longer need consumer info.
         credentials.consumer_key = None
@@ -263,7 +262,7 @@ class OAuth2(providers.AuthorizationProvider):
                 credentials.refresh_token = refresh_token
             
             # Handle different naming conventions across providers.
-            credentials = cls._x_credentials_parser(credentials, response.data)
+            credentials = self._x_credentials_parser(credentials, response.data)
         
         return response
     
@@ -652,6 +651,27 @@ class GitHub(OAuth2):
     * Dashboard: https://github.com/settings/applications/
     * Docs: http://developer.github.com/v3/#authentication
     * API reference: http://developer.github.com/v3/
+    
+    .. note::
+        
+        GitHub API `documentation <http://developer.github.com/v3/#user-agent-required>`_ sais:
+        
+            all API requests MUST include a valid ``User-Agent`` header.
+        
+        You can apply a default ``User-Agent`` header for all API calls in the config like this:
+        
+        .. code-block:: python
+            :emphasize-lines: 6
+        
+            CONFIG = {
+                'github': {
+                    'class_': oauth2.GitHub,
+                    'consumer_key': '#####',
+                    'consumer_secret': '#####',
+                    'access_headers': {'User-Agent': 'Awesome-Octocat-App'},
+                }
+            }
+    
     """
     
     user_authorization_url = 'https://github.com/login/oauth/authorize'
@@ -665,7 +685,14 @@ class GitHub(OAuth2):
         user.username = data.get('login')
         user.picture = data.get('avatar_url')
         user.link = data.get('html_url')
-        user.city, user.country = data.get('location', ', ').split(', ')
+        
+        user.city = data.get('location', '')
+        if ',' in user.city:
+            location = user.city.split(',')
+            user.city = location[0].strip()
+            if len(location) > 1:
+                user.country = location[1].strip()
+            
         return user
     
     @classmethod

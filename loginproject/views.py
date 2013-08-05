@@ -14,6 +14,7 @@ from pyramid.security import (
     remember,
     forget,
     authenticated_userid,
+    unauthenticated_userid
     )
 
 from .security import USERS
@@ -23,8 +24,11 @@ from sqlalchemy.exc import DBAPIError
 
 from .models import (
     DBSession,
-    MyModel,
+    User,
+    UserProfile
     )
+
+import logging
 
 from authomatic import Authomatic
 from authomatic.adapters import WebObAdapter
@@ -33,16 +37,25 @@ from config import CONFIG
 
 authomatic = Authomatic(config=CONFIG, secret='some random secret string')
 
-@view_config(route_name='home', permission='view')
+
+log = logging.getLogger(__name__)
+
+#@view_config(route_name='home', permission='view')
+@view_config(route_name='home', renderer='home.mako', permission='view')
 def home(request):
-    return Response('''
-        Login with <a href="login/facebook">Facebook</a>.<br />
-        Login with <a href="login/twitter">Twitter</a>.<br />
-        <form action="login/oi">
-            <input type="text" name="id" value="me.yahoo.com" />
-            <input type="submit" value="Authenticate With OpenID">
-        </form>
-    ''')
+    # return Response('''
+    #     Login with <a href="login/facebook">Facebook</a>.<br />
+    #     Login with <a href="login/twitter">Twitter</a>.<br />
+    #     <form action="login/oi">
+    #         <input type="text" name="id" value="me.yahoo.com" />
+    #         <input type="submit" value="Authenticate With OpenID">
+    #     </form>
+    # ''')
+    print unauthenticated_userid(request)
+    return {
+        'logged_in': authenticated_userid(request),
+        'user': request.user
+    }
 
 
 @view_config(route_name='protected', renderer='protected.mako', permission='edit')
@@ -61,17 +74,19 @@ def login(request):
     response = Response()
     # get provider
     provider = request.matchdict.get('provider')
-    
+
     result = authomatic.login(WebObAdapter(request, response),provider)
 
     # Do not write anything to the response if there is no result!
     if result:
         # If there is result, the login procedure is over and we can write to response.
-        response.write('<a href="..">Home</a>')
+        #response.write('<a href="..">Home</a>')
         
         if result.error:
+            log.error(result.error.message)
             # Login procedure finished with an error.
             response.write('<h2>Damn that error: {}</h2>'.format(result.error.message))
+            #print result.error.message
         
         elif result.user:
             # Hooray, we have the user!
@@ -80,6 +95,39 @@ def login(request):
             # We need to update the user to get more info.
             if not (result.user.name and result.user.id):
                 result.user.update()
+
+            # check is user already exists, if not, then add
+            thisuser = None
+            try:
+                thisuser = DBSession.query(User).filter(User.providerid == result.user.id)\
+                    .filter(User.provider == provider).first()
+                if not thisuser:
+                    NewUser = User(result.user.id, provider, result.user.credentials.serialize())
+                    
+                    DBSession.add(NewUser)
+                    DBSession.flush()
+                    # default profile name is whatever the provider display name is
+                    NewProfile = UserProfile(NewUser.id)
+                    NewProfile.displayname = result.user.name
+                    DBSession.add(NewProfile)
+                    DBSession.flush()
+
+                    thisuser = DBSession.query(User).filter(User.providerid == result.user.id)\
+                        .filter(User.provider == provider).first()
+
+                    # redirect to fill out userprofile?            
+            except DBAPIError as e:
+                log.error(e.message)
+
+
+            login_url = request.route_url('login', provider=provider)
+            referrer = request.url
+            if referrer == login_url:
+                referrer = request.route_url('home') # never use the login form itself as came_from
+            came_from = request.params.get('came_from', referrer)
+            headers = remember(request, thisuser.id)
+            
+            return HTTPFound(location = request.route_url('home'), headers = headers)
             
             # Welcome the user.
             response.write('<h1>Hi {}</h1>'.format(result.user.name))
@@ -87,6 +135,8 @@ def login(request):
             response.write('<h2>Your email is: {}</h2>'.format(result.user.email))
             
             # Seems like we're done, but there's more we can do...
+
+
             
             # If there are credentials (only by AuthorizationProvider),
             # we can _access user's protected resources.
