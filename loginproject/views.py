@@ -29,6 +29,7 @@ from .models import (
     )
 
 import logging
+import datetime
 
 from authomatic import Authomatic
 from authomatic.adapters import WebObAdapter
@@ -51,7 +52,7 @@ def home(request):
     #         <input type="submit" value="Authenticate With OpenID">
     #     </form>
     # ''')
-    print unauthenticated_userid(request)
+
     return {
         'logged_in': authenticated_userid(request),
         'user': request.user
@@ -109,13 +110,18 @@ def login(request):
                     # default profile name is whatever the provider display name is
                     NewProfile = UserProfile(NewUser.id)
                     NewProfile.displayname = result.user.name
+                    NewProfile.last_login = datetime.datetime.utcnow()
                     DBSession.add(NewProfile)
                     DBSession.flush()
 
                     thisuser = DBSession.query(User).filter(User.providerid == result.user.id)\
                         .filter(User.provider == provider).first()
 
-                    # redirect to fill out userprofile?            
+                    # redirect to fill out userprofile?  
+                else:
+                    thisuser.last_login = datetime.datetime.utcnow()
+                    DBSession.add(thisuser)
+                    DBSession.flush()          
             except DBAPIError as e:
                 log.error(e.message)
 

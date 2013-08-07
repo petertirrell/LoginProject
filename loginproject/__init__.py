@@ -6,11 +6,11 @@ from .models import (
     DBSession,
     LogSession,
     Base,
+    groupfinder
     )
 
 from pyramid.authentication import AuthTktAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
-from loginproject.security import groupfinder
 
 def main(global_config, **settings):
     """ This function returns a Pyramid WSGI application.
